@@ -1,5 +1,5 @@
 import "./App.css";
-import ImageCompressor from "./components/ImageCompressor";
+import { ImageCompressor } from "./components/ImageCompressor/index";
 
 function App() {
   return (
