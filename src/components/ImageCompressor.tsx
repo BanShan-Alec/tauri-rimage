@@ -146,6 +146,12 @@ const ImageCompressor = () => {
     } finally {
       setIsCompressing(false);
       setProgress(100);
+      requestAnimationFrame(() => {
+        window.scrollTo({
+          top: document.body.scrollHeight,
+          behavior: "smooth",
+        });
+      });
     }
   };
 
@@ -293,7 +299,7 @@ const ImageCompressor = () => {
 
           {/* 压缩选项 */}
           <div>
-            <h3 className="text-lg font-medium mb-4">压缩选项</h3>
+            <Label className="my-4">输出格式</Label>
             <Tabs
               defaultValue="jpg"
               onValueChange={(value) =>
@@ -410,12 +416,13 @@ const ImageCompressor = () => {
               </TabsContent>
             </Tabs>
           </div>
+          <Separator className="mt-8" />
         </CardContent>
         <CardFooter className="flex justify-between">
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={clearFiles}
-            disabled={isCompressing || files.length === 0}
+            disabled={isCompressing}
           >
             清除
           </Button>
