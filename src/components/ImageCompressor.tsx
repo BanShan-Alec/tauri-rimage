@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { downloadDir } from "@tauri-apps/api/path";
 // import { writeBinaryFile, BaseDirectory, createDir } from "@tauri-apps/api/fs";
 import { CompressionOptions, FileWithPath } from "../lib/types";
 import { cn } from "../lib/utils";
@@ -27,7 +28,8 @@ import { Label } from "./ui/label";
 import { Progress } from "./ui/progress";
 import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
-
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { useMount, useUnmount } from "react-use";
 const ImageCompressor = () => {
   const [files, setFiles] = useState<FileWithPath[]>([]);
   const [outputDir, setOutputDir] = useState<string>("");
@@ -41,34 +43,21 @@ const ImageCompressor = () => {
     filter: 0,
     compression: 6,
   });
+  const unlistenRef = useRef<() => void>();
 
-  // 处理文件拖放
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const droppedFiles: FileWithPath[] = [];
-    const items = e.dataTransfer.items;
-
-    if (items) {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.kind === "file") {
-          const file = item.getAsFile();
-          if (file) {
-            // @ts-ignore - Tauri adds path property to File objects
-            const path = file.path || "";
-            droppedFiles.push({
-              name: file.name,
-              path,
-              size: file.size,
-            });
-          }
-        }
-      }
-      setFiles((prev) => [...prev, ...droppedFiles]);
-    }
-  }, []);
+  const setFilesByPaths = (paths: string[]) => {
+    setFiles((prev) => {
+      const existingPaths = new Set(prev.map((f) => f.path));
+      const newFiles = paths
+        .filter((path) => !existingPaths.has(path))
+        .map((path) => ({
+          name: path.split(/[\\\/]/).pop() || "",
+          path,
+          size: 0,
+        }));
+      return [...prev, ...newFiles];
+    });
+  };
 
   // 处理文件选择
   const handleFileSelect = async () => {
@@ -82,14 +71,7 @@ const ImageCompressor = () => {
           },
         ],
       });
-
-      if (Array.isArray(selected)) {
-        const newFiles = selected.map((path) => {
-          const name = path.split(/[\\\/]/).pop() || "";
-          return { name, path, size: 0 };
-        });
-        setFiles((prev) => [...prev, ...newFiles]);
-      }
+      selected && setFilesByPaths(selected);
     } catch (error) {
       console.error("选择文件出错:", error);
     }
@@ -176,6 +158,27 @@ const ImageCompressor = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  useMount(async () => {
+    try {
+      const defaultOutputDir = await downloadDir();
+      setOutputDir(defaultOutputDir);
+    } catch (error) {
+      console.error("获取下载目录失败:", error);
+    }
+
+    unlistenRef.current = await getCurrentWebview().onDragDropEvent((event) => {
+      if (event.payload.type === "drop") {
+        const selected = event.payload.paths;
+        setFilesByPaths(selected);
+      }
+    });
+  });
+  useUnmount(() => {
+    if (unlistenRef.current) {
+      unlistenRef.current();
+    }
+  });
+
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <Card className="mb-6">
@@ -200,8 +203,8 @@ const ImageCompressor = () => {
               "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
               "hover:border-primary hover:bg-primary/5"
             )}
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
+            // onDrop={handleDrop}
+            // onDragOver={(e) => e.preventDefault()}
             onClick={handleFileSelect}
           >
             <div className="flex flex-col items-center justify-center space-y-2">
