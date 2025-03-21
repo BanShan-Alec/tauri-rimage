@@ -144,6 +144,7 @@ let ImageCompressor = (props: IProps) => {
     } finally {
       setIsCompressing(false);
       setProgress(100);
+      toast.info("压缩完成");
       requestAnimationFrame(() => {
         window.scrollTo({
           top: document.body.scrollHeight,
@@ -175,7 +176,15 @@ let ImageCompressor = (props: IProps) => {
     unlistenRef.current = await getCurrentWebview().onDragDropEvent((event) => {
       if (event.payload.type === "drop") {
         const selected = event.payload.paths;
-        setFilesByPaths(selected);
+        // 过滤掉非图片文件
+        const imageFiles = selected.filter((path) =>
+          /\.(png|jpg|jpeg|webp)$/i.test(path)
+        );
+        if (imageFiles.length !== selected.length) {
+          toast.error("仅支持PNG、JPG和WebP格式的图片");
+          return;
+        }
+        setFilesByPaths(imageFiles);
       }
     });
   });
